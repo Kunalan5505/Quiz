@@ -4,7 +4,7 @@
 <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><script>
 const rounds=[
 ['Know your partner',['Favourite food?','Dream holiday destination?','Ideal weekend?','Favourite way to receive affection?','Dream gift?']],
-['Truth or dare',[['What was your first impression of me?','Send your partner a voice note with three compliments.'],['What is your favourite memory of us?','Sing a few lines of a song for your partner on a call.'],['What gives you butterflies?','Send your funniest selfie.'],['What is a funny habit of mine?','Make up a silly nickname for your partner.'],['What romantic surprise would you love?','Write a four-line love poem.']]],
+['Truth or dare',[['What was your first impression of me?','Type three compliments for your partner.'],['What is your favourite memory of us?','Type a song title that reminds you of your partner and explain why.'],['What gives you butterflies?','Describe your funniest memory together in one sentence.'],['What is a funny habit of mine?','Make up a silly nickname for your partner.'],['What romantic surprise would you love?','Write a four-line love poem.']]],
 ['Most likely to',['Apologise first?','Fall asleep during a movie?','Plan a surprise date?','Forget where they put their phone?','Laugh at the wrong moment?']],
 ['Would you rather',[['Luxury holiday','Cosy road trip'],['Dinner date','Weekend getaway'],['Relive our first date','See our future together'],['Love letter','Surprise gift'],['Dream house','Travel the world']]],
 ['Deep connection',['When did you realise I was special?','What makes you feel appreciated?','What is our biggest shared dream?','What could we improve together?','What promise would you like to make?']]];
@@ -12,13 +12,13 @@ const app=document.querySelector('#app'),status=document.querySelector('#status'
 let peer,conn,me=host?0:1,localName='',names=['',''],state={i:0,scores:[0,0],answers:[null,null],ready:[false,false],started:false,judged:false,choice:null},connected=false,locked=false;
 function el(tag,t,parent=app){let x=document.createElement(tag);if(t!==undefined)x.textContent=t;parent.append(x);return x}
 function button(t,fn,parent=app,secondary=false){let b=el('button',t,parent);b.onclick=fn;if(secondary)b.className='secondary';return b}
-function sync(){if(host&&conn?.open)conn.send({type:'state',state,names});render()}
+function sync(){if(host&&conn?.open)conn.send({type:'state',state:{...state,answers:state.answers.every(a=>a!==null)?state.answers:[state.answers[0]===null?null:'Locked',state.answers[1]]},names});render()}
 function action(type,value){if(host)apply(0,type,value);else if(conn?.open){conn.send({type,value});locked=true;render()}}
 function apply(p,type,v){if(type==='name'){names[p]=String(v).slice(0,40);sync();return}
 if(!state.started)return;
 const r=Math.floor(state.i/5);
 if(type==='choice'&&r===1&&p===state.i%2&&!state.choice){state.choice=v;sync();return}
-if(type==='answer'&&state.answers[p]===null){if(r===1&&p!==state.i%2)return;state.answers[p]=String(v).slice(0,1000);if(r===1){state.answers[1-p]='—';if(v==='Completed')state.scores[p]+=2}
+if(type==='answer'&&state.answers[p]===null){if(r===1&&p!==state.i%2)return;state.answers[p]=String(v).slice(0,1000);if(r===1){state.answers[1-p]='—';if(v!=='Pass')state.scores[p]+=2}
 if(state.answers.every(a=>a!==null)&&[2,3].includes(r)&&state.answers[0]===state.answers[1]&&v!=='Pass'){state.scores[0]++;state.scores[1]++}sync();return}
 if(type==='judge'&&r===0&&p!==state.i%2&&state.answers.every(a=>a!==null)&&!state.judged){state.judged=true;if(v===true)state.scores[state.i%2]+=2;sync();return}
 if(type==='ready'&&state.answers.every(a=>a!==null)&&(r!==0||state.judged)){state.ready[p]=true;if(state.ready.every(Boolean)){state.i++;state.answers=[null,null];state.ready=[false,false];state.judged=false;state.choice=null}sync()}}
@@ -32,11 +32,11 @@ let score=el('div',undefined,card);score.className='scores';names.forEach((n,j)=
 if(state.i>=25){el('h2',state.scores[0]===state.scores[1]?'It is a tie! 💕':names[state.scores[0]>state.scores[1]?0:1]+' wins! 🏆',card);el('p','Winner chooses the next date. Thank each other for playing!',card);button('New game',()=>location.href=location.pathname,card);return}
 let r=Math.floor(state.i/5),q=rounds[r][1][state.i%5],turn=state.i%2;let bar=el('progress',undefined,card);bar.max=25;bar.value=state.i;el('small','Round '+(r+1)+' of 5 • Question '+(state.i+1)+' of 25',card);el('h2',rounds[r][0],card);
 if(r===1){el('p',names[turn]+'’s turn',card);if(!state.choice){if(me===turn){button('Truth',()=>action('choice',0+'t'),card);button('Dare',()=>action('choice',1+'d'),card)}else el('p','Waiting for your partner to choose…',card);return}el('h2',q[state.choice==='0t'?0:1],card)}else el('h2',Array.isArray(q)?'Would you rather…':q,card);
-if(state.answers.every(a=>a!==null)){if(r!==1)state.answers.forEach((a,j)=>{let box=el('div',names[j]+': '+a,card);box.className='answer'});else el('p',state.answers[turn],card);
+if(state.answers.every(a=>a!==null)){if(r!==1)state.answers.forEach((a,j)=>{let box=el('div',names[j]+': '+a,card);box.className='answer'});else {let box=el('div',names[turn]+': '+state.answers[turn],card);box.className='answer'}
 if(r===0&&!state.judged){if(me!==turn){button('Correct guess +2',()=>action('judge',true),card);button('Not quite',()=>action('judge',false),card,true)}else el('p','Waiting for your partner to judge…',card);return}
 if(state.ready[me]||locked)el('p','Waiting for your partner…',card);else button('Next question',()=>action('ready',true),card);return}
 if(locked||state.answers[me]!==null){el('p','Answer locked. Waiting for your partner…',card);return}
-if(r===1){if(me!==turn){el('p','Waiting for your partner to finish their challenge…',card);return}button('Completed +2',()=>action('answer','Completed'),card)}
+if(r===1){if(me!==turn){el('p','Waiting for your partner to finish their challenge…',card);return}let t=el('textarea',undefined,card);t.placeholder='Type your answer or challenge here…';button('Submit +2',()=>{if(t.value.trim())action('answer',t.value.trim())},card)}
 else if(r===2||r===3){(r===2?names:q).forEach(a=>button(a,()=>action('answer',a),card))}
 else{el('p',r===0?(me===turn?'Guess your partner’s answer.':'Answer about yourself.'): 'Both answer honestly. No points this round.',card);let t=el('textarea',undefined,card);t.placeholder='Your answer…';button('Lock answer',()=>{if(t.value.trim())action('answer',t.value.trim())},card)}
 button('Pass',()=>action('answer','Pass'),card,true)}
